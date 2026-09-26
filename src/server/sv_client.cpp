@@ -734,9 +734,10 @@ static void SV_CloseDownload( client_t *cl ) {
 	// EOF
 	if (cl->download) {
 		FS_FCloseFile( cl->download );
+		cl->download = 0;
 	}
-	cl->download = 0;
-	*cl->downloadName = 0;
+
+	*cl->downloadName = '\0';
 
 	// Free the temporary buffer space
 	for (i = 0; i < MAX_DOWNLOAD_WINDOW; i++) {
@@ -816,6 +817,8 @@ SV_BeginDownload_f
 ==================
 */
 static void SV_BeginDownload_f( client_t *cl ) {
+	if ( cl->state == CS_ACTIVE )
+		return;
 
 	// Kill any existing download
 	SV_CloseDownload( cl );
@@ -833,13 +836,15 @@ Check to see if the client wants a file, open it if needed and start pumping the
 Fill up msg with data, return number of download blocks added
 ==================
 */
-int SV_WriteDownloadToClient(client_t *cl, msg_t *msg)
+static int SV_WriteDownloadToClient(client_t *cl)
 {
 	int curindex;
 	int unreferenced = 1;
 	char errorMessage[1024];
 	char pakbuf[MAX_QPATH], *pakptr;
 	int numRefPaks;
+	msg_t msg;
+	byte msgBuffer[MAX_DOWNLOAD_BLKSIZE*2+8];
 
 	if (!*cl->downloadName)
 		return 0;	// Nothing being downloaded
@@ -914,15 +919,23 @@ int SV_WriteDownloadToClient(client_t *cl, msg_t *msg)
 				Com_Printf("clientDownload: %d : \"%s\" file not found on server\n", (int) (cl - svs.clients), cl->downloadName);
 				Com_sprintf(errorMessage, sizeof(errorMessage), "File \"%s\" not found on server for autodownloading.\n", cl->downloadName);
 			}
-			MSG_WriteByte( msg, svc_download );
-			MSG_WriteShort( msg, 0 ); // client is expecting block zero
-			MSG_WriteLong( msg, -1 ); // illegal file size
-			MSG_WriteString( msg, errorMessage );
+			MSG_Init( &msg, msgBuffer, sizeof( msgBuffer ) - 8 );
+			MSG_WriteLong( &msg, cl->lastClientCommand );
 
-			*cl->downloadName = 0;
+			MSG_WriteByte( &msg, svc_download );
+			MSG_WriteShort( &msg, 0 ); // client is expecting block zero
+			MSG_WriteLong( &msg, -1 ); // illegal file size
+			MSG_WriteString( &msg, errorMessage );
+
+			MSG_WriteByte( &msg, svc_EOF );
+			SV_Netchan_Transmit( cl, &msg );
+
+			*cl->downloadName = '\0';
 			
-			if(cl->download)
+			if(cl->download != 0) {
 				FS_FCloseFile(cl->download);
+				cl->download = 0;
+			}
 			
 			return 1;
 		}
@@ -946,7 +959,7 @@ int SV_WriteDownloadToClient(client_t *cl, msg_t *msg)
 
 		cl->downloadBlockSize[curindex] = FS_Read( cl->downloadBlocks[curindex], MAX_DOWNLOAD_BLKSIZE, cl->download );
 
-		if (cl->downloadBlockSize[curindex] < 0) {
+		if (cl->downloadBlockSize[curindex] <= 0) {
 			// EOF right now
 			cl->downloadCount = cl->downloadSize;
 			break;
@@ -986,18 +999,24 @@ int SV_WriteDownloadToClient(client_t *cl, msg_t *msg)
 	// Send current block
 	curindex = (cl->downloadXmitBlock % MAX_DOWNLOAD_WINDOW);
 
-	MSG_WriteByte( msg, svc_download );
-	MSG_WriteShort( msg, cl->downloadXmitBlock );
+	MSG_Init( &msg, msgBuffer, sizeof( msgBuffer ) - 8 );
+	MSG_WriteLong( &msg, cl->lastClientCommand );
+
+	MSG_WriteByte( &msg, svc_download );
+	MSG_WriteShort( &msg, cl->downloadXmitBlock );
 
 	// block zero is special, contains file size
 	if ( cl->downloadXmitBlock == 0 )
-		MSG_WriteLong( msg, cl->downloadSize );
+		MSG_WriteLong( &msg, cl->downloadSize );
 
-	MSG_WriteShort( msg, cl->downloadBlockSize[curindex] );
+	MSG_WriteShort( &msg, cl->downloadBlockSize[curindex] );
 
 	// Write the block
-	if(cl->downloadBlockSize[curindex])
-		MSG_WriteData(msg, cl->downloadBlocks[curindex], cl->downloadBlockSize[curindex]);
+	if(cl->downloadBlockSize[curindex] > 0)
+		MSG_WriteData( &msg, cl->downloadBlocks[curindex], cl->downloadBlockSize[curindex] );
+
+	MSG_WriteByte( &msg, svc_EOF );
+	SV_Netchan_Transmit( cl, &msg );
 
 	Com_DPrintf( "clientDownload: %d : writing block %d\n", (int) (cl - svs.clients), cl->downloadXmitBlock );
 
@@ -1053,28 +1072,16 @@ Send one round of download messages to all clients
 
 int SV_SendDownloadMessages(void)
 {
-	int i, numDLs = 0, retval;
+	int i, numDLs = 0;
 	client_t *cl;
-	msg_t msg;
-	byte msgBuffer[MAX_MSGLEN];
 	
 	for(i=0; i < sv_maxclients->integer; i++)
 	{
 		cl = &svs.clients[i];
 		
-		if(cl->state && *cl->downloadName)
+		if(cl->state >= CS_CONNECTED && *cl->downloadName)
 		{
-			MSG_Init(&msg, msgBuffer, sizeof(msgBuffer));
-			MSG_WriteLong(&msg, cl->lastClientCommand);
-			
-			retval = SV_WriteDownloadToClient(cl, &msg);
-				
-			if(retval)
-			{
-				MSG_WriteByte(&msg, svc_EOF);
-				SV_Netchan_Transmit(cl, &msg);
-				numDLs += retval;
-			}
+			numDLs += SV_WriteDownloadToClient(cl);
 		}
 	}
 
