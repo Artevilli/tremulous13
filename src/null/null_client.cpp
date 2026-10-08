@@ -47,7 +47,7 @@ void Key_WriteBindings( fileHandle_t f ) {
 void CL_Frame ( int msec ) {
 }
 
-void CL_PacketEvent( struct netadr_t from, struct msg_t *msg ) {
+void CL_PacketEvent( const struct netadr_t *from, struct msg_t *msg ) {
 }
 
 void CL_CharEvent( int key ) {

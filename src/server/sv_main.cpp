@@ -307,7 +307,7 @@ void SV_MasterHeartbeat(const char *message)
 				}
 				
 				if(res)
-					Com_Printf( "%s resolved to %s\n", sv_masters[a][i]->string, NET_AdrToStringwPort(adrs[a][i][0]));
+					Com_Printf( "%s resolved to %s\n", sv_masters[a][i]->string, NET_AdrToStringwPort(&adrs[a][i][0]));
 				else
 					Com_Printf( "%s has no IPv4 address.\n", sv_masters[a][i]->string);
 			}
@@ -325,7 +325,7 @@ void SV_MasterHeartbeat(const char *message)
 				}
 				
 				if(res)
-					Com_Printf( "%s resolved to %s\n", sv_masters[a][i]->string, NET_AdrToStringwPort(adrs[a][i][1]));
+					Com_Printf( "%s resolved to %s\n", sv_masters[a][i]->string, NET_AdrToStringwPort(&adrs[a][i][1]));
 				else
 					Com_Printf( "%s has no IPv6 address.\n", sv_masters[a][i]->string);
 			}
@@ -346,9 +346,9 @@ void SV_MasterHeartbeat(const char *message)
 		// ever incompatably changes
 
 		if(adrs[a][i][0].type != NA_BAD)
-			NET_OutOfBandPrint( NS_SERVER, adrs[a][i][0], "heartbeat %s\n", message);
+			NET_OutOfBandPrint( NS_SERVER, &adrs[a][i][0], "heartbeat %s\n", message);
 		if(adrs[a][i][1].type != NA_BAD)
-			NET_OutOfBandPrint( NS_SERVER, adrs[a][i][1], "heartbeat %s\n", message);
+			NET_OutOfBandPrint( NS_SERVER, &adrs[a][i][1], "heartbeat %s\n", message);
 	}
 	// outdent
 	}
@@ -395,15 +395,15 @@ leakyBucket_t outboundLeakyBucket;
 SVC_HashForAddress
 ================
 */
-static long SVC_HashForAddress( netadr_t address ) {
-	byte 		*ip = NULL;
+static long SVC_HashForAddress( const netadr_t *address ) {
+	const uint8_t 		*ip = NULL;
 	size_t	size = 0;
 	int			i;
 	long		hash = 0;
 
-	switch ( address.type ) {
-		case NA_IP:  ip = address.ip;  size = 4; break;
-		case NA_IP6: ip = address.ip6; size = 16; break;
+	switch ( address->type ) {
+		case NA_IP:  ip = address->ip;  size = 4; break;
+		case NA_IP6: ip = address->ip6; size = 16; break;
 		default: break;
 	}
 
@@ -430,7 +430,7 @@ SVC_BucketForAddress
 Find or allocate a bucket for an address
 ================
 */
-static leakyBucket_t *SVC_BucketForAddress( netadr_t address, int burst, int period ) {
+static leakyBucket_t *SVC_BucketForAddress( const netadr_t *address, int burst, int period ) {
 	leakyBucket_t *bucket = NULL;
 	long hash = SVC_HashForAddress( address );
 	int now = Sys_Milliseconds();
@@ -440,12 +440,12 @@ static leakyBucket_t *SVC_BucketForAddress( netadr_t address, int burst, int per
 		switch ( bucket->type )
         {
 			case NA_IP:
-				if ( ::memcmp( bucket->ipv._4, address.ip, 4 ) == 0 )
+				if ( ::memcmp( bucket->ipv._4, address->ip, 4 ) == 0 )
 					return bucket;
 				break;
 
 			case NA_IP6:
-				if ( ::memcmp( bucket->ipv._6, address.ip6, 16 ) == 0 )
+				if ( ::memcmp( bucket->ipv._6, address->ip6, 16 ) == 0 )
 					return bucket;
 				break;
 
@@ -480,10 +480,10 @@ static leakyBucket_t *SVC_BucketForAddress( netadr_t address, int burst, int per
 		}
 
 		if ( bucket->type == NA_BAD ) {
-			bucket->type = address.type;
-			switch ( address.type ) {
-                case NA_IP:  ::memcpy( bucket->ipv._4, address.ip, 4 ); break;
-                case NA_IP6: ::memcpy( bucket->ipv._6, address.ip6, 16 ); break;
+			bucket->type = address->type;
+			switch ( address->type ) {
+                case NA_IP:  ::memcpy( bucket->ipv._4, address->ip, 4 ); break;
+                case NA_IP6: ::memcpy( bucket->ipv._6, address->ip6, 16 ); break;
 				default: break;
 			}
 
@@ -564,7 +564,7 @@ SVC_RateLimitAddress
 Rate limit for a particular address
 ================
 */
-bool SVC_RateLimitAddress( netadr_t from, int burst, int period )
+bool SVC_RateLimitAddress( const netadr_t *from, int burst, int period )
 {
 	leakyBucket_t *bucket = SVC_BucketForAddress( from, burst, period );
 	return SVC_RateLimit( bucket, burst, period );
@@ -579,7 +579,7 @@ and all connected players.  Used for getting detailed information after
 the simple info query.
 ================
 */
-static void SVC_Status( netadr_t from ) {
+static void SVC_Status( const netadr_t *from ) {
 	char	player[1024];
 	char	status[MAX_MSGLEN];
 	int		i;
@@ -617,8 +617,8 @@ static void SVC_Status( netadr_t from ) {
 	// to prevent timed spoofed reply packets that add ghost servers
 	Info_SetValueForKey( infostring, "challenge", Cmd_Argv(1) );
 
-	if ( from.alternateProtocol != 0 )
-		Info_SetValueForKey( infostring, "protocol", from.alternateProtocol == 2 ? "69" : "70" );
+	if ( from->alternateProtocol != 0 )
+		Info_SetValueForKey( infostring, "protocol", from->alternateProtocol == 2 ? "69" : "70" );
 
 	status[0] = 0;
 	statusLength = 0;
@@ -649,7 +649,7 @@ Responds with a short info message that should be enough to determine
 if a user is interested in a server to do a full status
 ================
 */
-void SVC_Info( netadr_t from ) {
+void SVC_Info( const netadr_t *from ) {
 	int		i, count;
 	const char *gamedir;
 	char	infostring[MAX_INFO_STRING];
@@ -692,7 +692,7 @@ void SVC_Info( netadr_t from ) {
 	// to prevent timed spoofed reply packets that add ghost servers
 	Info_SetValueForKey( infostring, "challenge", Cmd_Argv(1) );
 
-	Info_SetValueForKey( infostring, "protocol", va("%i", from.alternateProtocol == 2 ? 69 : from.alternateProtocol == 1 ? 70 : PROTOCOL_VERSION) );
+	Info_SetValueForKey( infostring, "protocol", va("%i", from->alternateProtocol == 2 ? 69 : from->alternateProtocol == 1 ? 70 : PROTOCOL_VERSION) );
 	Info_SetValueForKey( infostring, "gamename", GAMENAME_FOR_MASTER );
 	Info_SetValueForKey( infostring, "hostname", sv_hostname->string );
 	Info_SetValueForKey( infostring, "mapname", sv_mapname->string );
@@ -727,8 +727,8 @@ SVC_FlushRedirect
 
 ================
 */
-static void SV_FlushRedirect( char *outputbuf ) {
-	NET_OutOfBandPrint( NS_SERVER, svs.redirectAddress, "print\n%s", outputbuf );
+static void SV_FlushRedirect( const char *outputbuf ) {
+	NET_OutOfBandPrint( NS_SERVER, &svs.redirectAddress, "print\n%s", outputbuf );
 }
 
 /**
@@ -742,13 +742,13 @@ static void SV_FlushRedirect( char *outputbuf ) {
  *
  * @note Don't call this if sv_protect 2 flag is not set!
  */
-bool SV_CheckDRDoS(netadr_t from) {
+bool SV_CheckDRDoS(const netadr_t *from) {
 	int        i;
 	int        globalCount;
 	int        specificCount;
 	int        timeNow;
 	receipt_t  *receipt;
-	netadr_t   exactFrom;
+	netadr_t   modifiedFrom;
 	int        oldest;
 	int        oldestTime;
 	static int lastGlobalLogTime   = 0;
@@ -763,7 +763,7 @@ bool SV_CheckDRDoS(netadr_t from) {
 	}
 
 	timeNow   = svs.time;
-	exactFrom = from;
+	modifiedFrom = *from;
 
 	// Time has wrapped
 	if (lastGlobalLogTime > timeNow || lastSpecificLogTime > timeNow) {
@@ -778,10 +778,10 @@ bool SV_CheckDRDoS(netadr_t from) {
 		}
 	}
 
-	if (from.type == NA_IP) {
-		from.ip[3] = 0; // xx.xx.xx.0
+	if (modifiedFrom.type == NA_IP) {
+		modifiedFrom.ip[3] = 0; // xx.xx.xx.0
 	} else {
-		from.ip6[15] = 0;
+		modifiedFrom.ip6[15] = 0;
 	}
 
 	// Count receipts in last 2 seconds.
@@ -801,7 +801,7 @@ bool SV_CheckDRDoS(netadr_t from) {
 				// first frame of a server's life.
 				globalCount++;
 			}
-			if (NET_CompareBaseAdr(from, receipt->adr)) {
+			if (NET_CompareBaseAdr(&modifiedFrom, &receipt->adr)) {
 				specificCount++;
 			}
 		}
@@ -822,7 +822,7 @@ bool SV_CheckDRDoS(netadr_t from) {
 	if (specificCount >= 3) { // Already sent 3 to this IP in last 2 seconds.
 		if (lastSpecificLogTime + 1000 <= timeNow) { // Limit one log every second.
 			SV_WriteAttackLog(va("Possible DRDoS attack to address %s, ignoring getinfo/getstatus connectionless packet\n",
-			                     NET_AdrToString(exactFrom)));
+			                     NET_AdrToString(from)));
 			lastSpecificLogTime = timeNow;
 		}
 
@@ -830,7 +830,7 @@ bool SV_CheckDRDoS(netadr_t from) {
 	}
 
 	receipt       = &svs.infoReceipts[oldest];
-	receipt->adr  = from;
+	receipt->adr  = modifiedFrom;
 	receipt->time = timeNow;
 	return false;
 }
@@ -844,7 +844,7 @@ Shift down the remaining args
 Redirect all printfs
 ===============
 */
-static void SVC_RemoteCommand( netadr_t from, msg_t *msg ) {
+static void SVC_RemoteCommand( const netadr_t *from, msg_t *msg ) {
 	bool valid;
 	char		remaining[1024];
 	// TTimo - scaled down to accumulate, but not overflow anything network wise, print wise etc.
@@ -879,7 +879,7 @@ static void SVC_RemoteCommand( netadr_t from, msg_t *msg ) {
 	}
 
 	// start redirecting all print outputs to the packet
-	svs.redirectAddress = from;
+	svs.redirectAddress = *from;
 	Com_BeginRedirect (sv_outputbuf, SV_OUTPUTBUF_LENGTH, SV_FlushRedirect);
 
 	if ( !strlen( sv_rconPassword->string ) ) {
@@ -922,7 +922,7 @@ Clients that are in the game can still send
 connectionless packets.
 =================
 */
-static void SV_ConnectionlessPacket( netadr_t from, msg_t *msg ) {
+static void SV_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 	char	*s;
 	const char	*c;
 
@@ -978,7 +978,7 @@ static void SV_ConnectionlessPacket( netadr_t from, msg_t *msg ) {
 SV_PacketEvent
 =================
 */
-void SV_PacketEvent( netadr_t from, msg_t *msg ) {
+void SV_PacketEvent( const netadr_t *from, msg_t *msg ) {
 	int			i;
 	client_t	*cl;
 	int			qport;
@@ -1000,7 +1000,7 @@ void SV_PacketEvent( netadr_t from, msg_t *msg ) {
 		if (cl->state == CS_FREE) {
 			continue;
 		}
-		if ( !NET_CompareBaseAdr( from, cl->netchan.remoteAddress ) ) {
+		if ( !NET_CompareBaseAdr( from, &cl->netchan.remoteAddress ) ) {
 			continue;
 		}
 		// it is possible to have multiple clients from a single IP
@@ -1009,16 +1009,15 @@ void SV_PacketEvent( netadr_t from, msg_t *msg ) {
 			continue;
 		}
 
-		// the IP port can't be used to differentiate them, because
-		// some address translating routers periodically change UDP
-		// port assignments
-		if (cl->netchan.remoteAddress.port != from.port) {
-			Com_Printf( "SV_PacketEvent: fixing up a translated port\n" );
-			cl->netchan.remoteAddress.port = from.port;
-		}
-
 		// make sure it is a valid, in sequence packet
 		if (SV_Netchan_Process(cl, msg)) {
+			// the IP port can't be used to differentiate them, because
+			// some address translating routers periodically change UDP
+			// port assignments
+			if (cl->netchan.remoteAddress.port != from->port) {
+				Com_Printf( "SV_PacketEvent: fixing up a translated port\n" );
+				cl->netchan.remoteAddress.port = from->port;
+			}
 			// zombie clients still need to do the Netchan_Process
 			// to make sure they don't need to retransmit the final
 			// reliable message, but they don't do any other processing
@@ -1026,8 +1025,8 @@ void SV_PacketEvent( netadr_t from, msg_t *msg ) {
 				cl->lastPacketTime = svs.time;	// don't timeout
 				SV_ExecuteClientMessage( cl, msg );
 			}
+			return;
 		}
-		return;
 	}
 }
 

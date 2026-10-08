@@ -171,7 +171,7 @@ sysEvent_t	Com_GetSystemEvent( void );
 char		*CopyString( const char *in );
 void		Info_Print( const char *s );
 
-void		Com_BeginRedirect (char *buffer, int buffersize, void (*flush)(char *));
+void		Com_BeginRedirect (char *buffer, int buffersize, void (*flush)(const char *));
 void		Com_EndRedirect( void );
 
 //#ifndef __Q_SHARED_H
@@ -189,7 +189,7 @@ int			Com_Filter(const char* filter, char *name, int casesensitive);
 int			Com_FilterPath(const char *filter, char *name, int casesensitive);
 int			Com_RealTime(qtime_t *qtime);
 bool	Com_SafeMode( void );
-void		Com_RunAndTimeServerPacket(struct netadr_t *evFrom, struct msg_t *buf);
+void		Com_RunAndTimeServerPacket(const struct netadr_t *evFrom, struct msg_t *buf);
 
 bool	Com_IsVoipTarget(uint8_t *voipTargets, int voipTargetsSize, int clientNum);
 
@@ -337,7 +337,7 @@ void CL_MouseEvent( int dx, int dy, int time );
 
 void CL_JoystickEvent( int axis, int value, int time );
 
-void CL_PacketEvent( struct netadr_t from, struct msg_t *msg );
+void CL_PacketEvent( const struct netadr_t *from, struct msg_t *msg );
 
 void CL_ConsolePrint( const char *text );
 
@@ -378,7 +378,7 @@ void SCR_DebugGraph (float value);	// FIXME: move logging to common?
 void SV_Init( void );
 void SV_Shutdown( const char *finalmsg );
 void SV_Frame( int msec );
-void SV_PacketEvent( struct netadr_t from, struct msg_t *msg );
+void SV_PacketEvent( const struct netadr_t *from, struct msg_t *msg );
 int SV_FrameMsec(void);
 bool SV_GameCommand( void );
 int SV_SendQueuedPackets(void);

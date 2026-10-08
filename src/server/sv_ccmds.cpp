@@ -271,7 +271,7 @@ static void SV_Status_f(void) {
 			Com_Printf("%4i ", ping);
 		}
 
-		s = NET_AdrToString(cl->netchan.remoteAddress);
+		s = NET_AdrToString(&cl->netchan.remoteAddress);
 
 		// extend the name length by couting extra color characters to keep well formated output
 		maxNameLength = sizeof(cl->name) + (strlen(cl->name) - Q_PrintStrlen(cl->name)) + 1;

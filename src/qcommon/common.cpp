@@ -132,9 +132,9 @@ void CIN_CloseAllVideos( void );
 
 static char* rd_buffer;
 static unsigned int rd_buffersize;
-static void (*rd_flush)( char *buffer );
+static void (*rd_flush)( const char *buffer );
 
-void Com_BeginRedirect (char *buffer, int buffersize, void (*flush)( char *) )
+void Com_BeginRedirect (char *buffer, int buffersize, void (*flush)( const char *) )
 {
     if (!buffer || !buffersize || !flush)
         return;
@@ -2203,13 +2203,13 @@ sysEvent_t Com_GetEvent(void)
 Com_RunAndTimeServerPacket
 =================
 */
-void Com_RunAndTimeServerPacket( netadr_t *evFrom, msg_t *buf )
+void Com_RunAndTimeServerPacket( const netadr_t *evFrom, msg_t *buf )
 {
     int t1 = 0;
     if ( com_speeds->integer )
         t1 = Sys_Milliseconds();
 
-    SV_PacketEvent(*evFrom, buf);
+    SV_PacketEvent(evFrom, buf);
 
     if ( com_speeds->integer )
     {
@@ -2245,7 +2245,7 @@ int Com_EventLoop(void)
         {
             // manually send packet events for the loopback channel
             while ( NET_GetLoopPacket( NS_CLIENT, &evFrom, &buf ) )
-                CL_PacketEvent( evFrom, &buf );
+                CL_PacketEvent( &evFrom, &buf );
 
             // if the server just shut down, flush the events
             while ( NET_GetLoopPacket( NS_SERVER, &evFrom, &buf ) )

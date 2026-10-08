@@ -64,17 +64,17 @@ void NET_Shutdown(void);
 void NET_Restart_f(void);
 void NET_Config(bool enableNetworking);
 void NET_FlushPacketQueue(void);
-void NET_SendPacket(netsrc_t sock, int length, const void *data, struct netadr_t to);
-void NET_OutOfBandPrint(netsrc_t net_socket, struct netadr_t adr, const char *format, ...)
+void NET_SendPacket(netsrc_t sock, int length, const void *data, const struct netadr_t *to);
+void NET_OutOfBandPrint(netsrc_t net_socket, const struct netadr_t *adr, const char *format, ...)
     __attribute__((format(printf, 3, 4)));
-void NET_OutOfBandData(netsrc_t sock, struct netadr_t adr, uint8_t *format, int len);
+void NET_OutOfBandData(netsrc_t sock, const struct netadr_t *adr, const uint8_t *format, int len);
 
-bool NET_CompareAdr(struct netadr_t a, struct netadr_t b);
-bool NET_CompareBaseAdrMask(struct netadr_t a, struct netadr_t b, int netmask);
-bool NET_CompareBaseAdr(struct netadr_t a, struct netadr_t b);
-bool NET_IsLocalAddress(struct netadr_t adr);
-const char *NET_AdrToString(struct netadr_t a);
-const char *NET_AdrToStringwPort(struct netadr_t a);
+bool NET_CompareAdr(const struct netadr_t *a, const struct netadr_t *b);
+bool NET_CompareBaseAdrMask(const struct netadr_t *a, const struct netadr_t *b, int netmask);
+bool NET_CompareBaseAdr(const struct netadr_t *a, const struct netadr_t *b);
+bool NET_IsLocalAddress(const struct netadr_t *adr);
+const char *NET_AdrToString(const struct netadr_t *a);
+const char *NET_AdrToStringwPort(const struct netadr_t *a);
 int NET_StringToAdr(const char *s, struct netadr_t *a, enum netadrtype_t family);
 bool NET_GetLoopPacket(netsrc_t sock, struct netadr_t *net_from, struct msg_t *net_message);
 void NET_JoinMulticast6(void);
@@ -125,16 +125,16 @@ typedef struct {
 
 void Netchan_Init(int qport);
 void Netchan_Setup(
-    int alternateProtocol, netsrc_t sock, netchan_t *chan, struct netadr_t adr, int qport, int challenge);
+    int alternateProtocol, netsrc_t sock, netchan_t *chan, const struct netadr_t *adr, int port, int challenge);
 
 void Netchan_Transmit(netchan_t *chan, int length, const uint8_t *data);
 void Netchan_TransmitNextFragment(netchan_t *chan);
 
 bool Netchan_Process(netchan_t *chan, struct msg_t *msg);
 
-void Sys_SendPacket(int length, const void *data, struct netadr_t to);
+void Sys_SendPacket(int length, const void *data, const struct netadr_t *to);
 bool Sys_StringToAdr(const char *s, struct netadr_t *a, enum netadrtype_t family); // Does NOT parse port numbers, only base addresses.
-bool Sys_IsLANAddress(struct netadr_t adr);
+bool Sys_IsLANAddress(const struct netadr_t *adr);
 void Sys_ShowIP(void); 
 
 #define SV_ENCODE_START 4
